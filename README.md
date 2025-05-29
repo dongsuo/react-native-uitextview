@@ -1,20 +1,106 @@
-![image](https://haileyok.com/content/images/size/w1920/2024/01/IMG_4730.jpeg)
+# React Native UITextView with Custom Context Menu
 
-### Note about support for this library
-This library was made for the
-[Bluesky Social App](https://github.com/bluesky-social/social-app). Support for this library
-is very much dependent on two factors:
+[![npm version](https://img.shields.io/npm/v/@dongsuo/react-native-uitextview?style=flat-square)](https://www.npmjs.com/package/@dongsuo/react-native-uitextview)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg?style=flat-square)](https://opensource.org/licenses/MIT)
 
-1. Do we have time to implement a feature or fix an issue?
-2. How important is the feature to Bluesky or does it fix an issue present in Bluesky?
+An enhanced fork of `react-native-uitextview` with custom context menu support for React Native iOS applications.
 
-If there are features that you want to see in this library that don't already exist and
-likely (or definitely) do not greatly improve the experience in Bluesky, please feel free
-to submit a PR! Of course, you should also feel free to make feature suggestions or
-bug reports as well, and whenever free time is available the might be worked on. Just know
-it might take some time.
+## Features
 
-Thank you!
+- Full support for UITextView on iOS
+- Customizable context menu with your own actions
+- Hide system default menu items
+- Easy to integrate and use
+- Maintains all original functionality
+
+## Installation
+
+```bash
+yarn add @dongsuo/react-native-uitextview
+# or
+npm install @dongsuo/react-native-uitextview
+```
+
+### iOS
+
+Run the following command to install the native dependencies:
+
+```bash
+cd ios && pod install && cd ..
+```
+
+## Usage
+
+### Basic Usage
+
+```jsx
+import {UITextView} from '@dongsuo/react-native-uitextview'
+
+// In your component
+;<UITextView
+  style={{height: 100, borderWidth: 1, padding: 10}}
+  placeholder="Type something..."
+  selectable={true}
+  uiTextView={true}
+/>
+```
+
+### Custom Context Menu
+
+```jsx
+import {UITextView} from '@dongsuo/react-native-uitextview'
+
+const MyComponent = () => {
+  const handleCustomMenuAction = event => {
+    const {actionId, selectedText} = event.nativeEvent
+    console.log(`Action: ${actionId}`, `Selected text: ${selectedText}`)
+
+    // Handle different actions
+    switch (actionId) {
+      case 'translate':
+        // Handle translate action
+        break
+      case 'share':
+        // Handle share action
+        break
+      case 'search':
+        // Handle search action
+        break
+    }
+  }
+
+  return (
+    <UITextView
+      style={{height: 100, borderWidth: 1, padding: 10}}
+      placeholder="Select text to see custom menu"
+      selectable={true}
+      uiTextView={true}
+      customMenuItems={[
+        {title: 'Translate', actionId: 'translate'},
+        {title: 'Share', actionId: 'share'},
+        {title: 'Search', actionId: 'search'},
+      ]}
+      onCustomMenuAction={handleCustomMenuAction}
+    />
+  )
+}
+```
+
+## Props
+
+| Prop                 | Type                                                                       | Description                                                        | Default |
+| -------------------- | -------------------------------------------------------------------------- | ------------------------------------------------------------------ | ------- |
+| `customMenuItems`    | `Array<{title: string, actionId: string}>`                                 | Array of custom menu items to show when text is selected           | `[]`    |
+| `onCustomMenuAction` | `(event: {nativeEvent: {actionId: string, selectedText: string}}) => void` | Callback when a custom menu item is pressed                        | -       |
+| ...                  | ...                                                                        | All other props from React Native's `Text` component are supported | -       |
+
+## License
+
+MIT
+
+## Credits
+
+Forked from [react-native-uitextview](https://github.com/bluesky-social/react-native-uitextview) by [Hailey](https://github.com/haileyok)
 
 # React Native UITextView
 
@@ -55,9 +141,9 @@ React Native UITextView can - for the most part - be used as a drop-in replaceme
 for existing blocks of `Text`. However, there are a few limitations:
 
 - Children of `UITextView` may only be other UITextView children (base `Text` children
-will be converted to `UITextView` children, so you only need to adjust the wrapper).
-This means that things like in-line images are not supported as they are in the base
-React Native `Text` component.
+  will be converted to `UITextView` children, so you only need to adjust the wrapper).
+  This means that things like in-line images are not supported as they are in the base
+  React Native `Text` component.
 - A few styles have not yet been implemented, but all should be possible.
 
 ## Usage
@@ -72,7 +158,7 @@ will always be used. On iOS, the base React Native `Text` component will be used
 unless the `selectable` and the `uiTextView` props are both `true`.
 
 ```tsx
-import { UITextView as Text } from "react-native-uitextview";
+import {UITextView as Text} from 'react-native-uitextview'
 
 function SomeView() {
   return (
@@ -80,8 +166,7 @@ function SomeView() {
       <Text
         style={{color: 'green', lineHeight: 20, fontSize: 14}}
         selectable
-        uiTextView
-      >
+        uiTextView>
         This is some highlightable text! It uses UITextView
       </Text>
       <Text
@@ -94,8 +179,8 @@ function SomeView() {
         style={{color: 'red', lineHeight: 20, fontSize: 14}}
         uiTextView // Note we do not add the selectable prop
       >
-        This text still uses the base Text component. It can't be highlighted
-        or copied at all.
+        This text still uses the base Text component. It can't be highlighted or
+        copied at all.
       </Text>
     </View>
   )
@@ -111,8 +196,7 @@ add to a link.
   This is some text that's highlightable with{' '}
   <Text
     style={{color: 'blue', textDecorationLine: 'underline'}}
-    onPress={() => Linking.openURL('https://google.com')}
-  >
+    onPress={() => Linking.openURL('https://google.com')}>
     a link
   </Text>
   .

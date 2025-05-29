@@ -6,6 +6,18 @@ import {
   type TextProps,
   type ViewStyle,
 } from 'react-native'
+
+// 自定义菜单项接口
+interface CustomMenuItem {
+  title: string
+  actionId: string
+}
+
+// 自定义菜单事件接口
+interface CustomMenuActionEvent {
+  actionId: string
+  selectedText: string
+}
 import RNUITextViewChildNativeComponent from './RNUITextViewChildNativeComponent'
 import RNUITextViewNativeComponent from './RNUITextViewNativeComponent'
 import {flattenStyles} from './util'
@@ -22,13 +34,20 @@ const textDefaults: TextProps = {
 
 const useTextAncestorContext = () => React.useContext(TextAncestorContext)
 
+// 扩展 TextProps 类型添加自定义菜单相关属性
+type ExtendedTextProps = TextProps & {
+  uiTextView?: boolean
+  customMenuItems?: CustomMenuItem[]
+  onCustomMenuAction?: (event: CustomMenuActionEvent) => void
+}
+
 function UITextViewChild({
   style,
   children,
+  customMenuItems,
+  onCustomMenuAction,
   ...rest
-}: TextProps & {
-  uiTextView?: boolean
-}) {
+}: ExtendedTextProps) {
   const [isAncestor, rootStyle] = useTextAncestorContext()
 
   // Flatten the styles, and apply the root styles when needed
@@ -36,7 +55,7 @@ function UITextViewChild({
     () => flattenStyles(rootStyle, style),
     [rootStyle, style],
   )
-
+  console.log('customMenuItems', customMenuItems)
   if (!isAncestor) {
     return (
       <TextAncestorContext.Provider value={[true, flattenedStyle]}>
@@ -45,6 +64,15 @@ function UITextViewChild({
           {...rest}
           // ellipsizeMode={rest.ellipsizeMode ?? rest.lineBreakMode ?? 'tail'}
           style={[flattenedStyle]}
+          // 自定义菜单相关属性
+          customMenuItems={customMenuItems}
+          onCustomMenuAction={event => {
+            onCustomMenuAction &&
+              onCustomMenuAction({
+                actionId: event.nativeEvent.actionId,
+                selectedText: event.nativeEvent.selectedText,
+              })
+          }}
           // @ts-expect-error Weirdness
           onPress={undefined}
           onLongPress={undefined}>
@@ -92,25 +120,29 @@ function UITextViewChild({
   }
 }
 
-function UITextViewInner(
-  props: TextProps & {
-    uiTextView?: boolean
-  },
-) {
+function UITextViewInner(props: ExtendedTextProps) {
   const [isAncestor] = useTextAncestorContext()
 
   // Even if the uiTextView prop is set, we can still default to using
   // normal selection (i.e. base RN text) if the text doesn't need to be
   // selectable
   if ((!props.selectable || !props.uiTextView) && !isAncestor) {
-    return <RNText {...props} />
+    // 当使用原生 RNText 时，自定义菜单功能不可用
+    // Using _ prefix to indicate these are intentionally unused
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    const {customMenuItems: _, onCustomMenuAction: __, ...restProps} = props
+    return <RNText {...restProps} />
   }
   return <UITextViewChild {...props} />
 }
 
-export function UITextView(props: TextProps & {uiTextView?: boolean}) {
+export function UITextView(props: ExtendedTextProps) {
   if (Platform.OS !== 'ios') {
-    return <RNText {...props} />
+    // 当不是 iOS 平台时，自定义菜单功能不可用
+    // Using _ prefix to indicate these are intentionally unused
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    const {customMenuItems: _, onCustomMenuAction: __, ...restProps} = props
+    return <RNText {...restProps} />
   }
   return <UITextViewInner {...props} />
 }
