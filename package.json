@@ -181,7 +181,6 @@
     "lib/"
   ],
   "dependencies": {
-    "arktype": "2.1.15",
-    "react-native-monorepo-config": "^0.1.9"
+    "arktype": "2.1.15"
   }
 }

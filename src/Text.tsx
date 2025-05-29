@@ -20,7 +20,7 @@ interface CustomMenuActionEvent {
 }
 import RNUITextViewChildNativeComponent from './RNUITextViewChildNativeComponent'
 import RNUITextViewNativeComponent from './RNUITextViewNativeComponent'
-import {flattenStyles} from './util'
+import { flattenStyles } from './util'
 
 const TextAncestorContext = React.createContext<[boolean, ViewStyle]>([
   false,
@@ -129,7 +129,7 @@ function UITextViewInner(props: ExtendedTextProps) {
     // 当使用原生 RNText 时，自定义菜单功能不可用
     // Using _ prefix to indicate these are intentionally unused
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    const {customMenuItems: _, onCustomMenuAction: __, ...restProps} = props
+    const { customMenuItems: _, onCustomMenuAction: __, ...restProps } = props
     return <RNText {...restProps} />
   }
   return <UITextViewChild {...props} />
@@ -140,7 +140,7 @@ export function UITextView(props: ExtendedTextProps) {
     // 当不是 iOS 平台时，自定义菜单功能不可用
     // Using _ prefix to indicate these are intentionally unused
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    const {customMenuItems: _, onCustomMenuAction: __, ...restProps} = props
+    const { customMenuItems: _, onCustomMenuAction: __, ...restProps } = props
     return <RNText {...restProps} />
   }
   return <UITextViewInner {...props} />

@@ -9,6 +9,7 @@
 #import <react/renderer/components/RNUITextViewSpec/EventEmitters.h>
 #import <react/renderer/components/RNUITextViewSpec/Props.h>
 #import <react/renderer/components/RNUITextViewSpec/RCTComponentViewHelpers.h>
+#import <objc/runtime.h>
 #import "RCTFabricComponentsPlugins.h"
 
 using namespace facebook::react;
@@ -418,10 +419,18 @@ void customMenuItemIMP(id self, SEL _cmd, id sender) {
         action == @selector(select:) || // Handles 'Select' if it appears
         action == @selector(selectAll:) ||
         action == @selector(delete:) ||
+        action == @selector(_lookup:) || // Common system actions
+        action == @selector(_define:) ||
+        action == @selector(_translate:) || // System translate, if different from custom
         action == @selector(share:) || // System share, if different from custom (e.g., UIActivityViewController)
+        action == NSSelectorFromString(@"_share:") || // Another variant of system share
         action == NSSelectorFromString(@"promptForReplace:") ||
+        action == NSSelectorFromString(@"_promptForReplace:") ||
         action == NSSelectorFromString(@"transliterateChinese:") ||
+        action == NSSelectorFromString(@"_transliterateChinese:") ||
+        action == NSSelectorFromString(@"_insertDrawing:") ||
         action == NSSelectorFromString(@"captureTextFromCamera:") ||
+        action == NSSelectorFromString(@"_startWritingTools:") ||
         action == @selector(toggleBoldface:) ||
         action == @selector(toggleItalics:) ||
         action == @selector(toggleUnderline:) ||
