@@ -2876,6 +2876,7 @@ __metadata:
     react: 19.0.0
     react-native: 0.79.2
     react-native-builder-bob: 0.40.7
+    react-native-monorepo-config: ^0.1.9
     react-native-test-app: 4.0.4
     release-it: ^19.0.1
     turbo: ^1.10.7

@@ -55,7 +55,6 @@ function UITextViewChild({
     () => flattenStyles(rootStyle, style),
     [rootStyle, style],
   )
-  console.log('customMenuItems', customMenuItems)
   if (!isAncestor) {
     return (
       <TextAncestorContext.Provider value={[true, flattenedStyle]}>

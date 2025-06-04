@@ -36,6 +36,14 @@ class RNUITextViewEventEmitter : public ViewEventEmitter {
       int target;
     std::vector<std::string> lines;
     };
+
+  struct OnCustomMenuAction {
+      int target;
+    std::string actionId;
+    std::string selectedText;
+    };
   void onTextLayout(OnTextLayout value) const;
+
+  void onCustomMenuAction(OnCustomMenuAction value) const;
 };
 } // namespace facebook::react
