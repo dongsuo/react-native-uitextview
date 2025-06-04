@@ -2,6 +2,7 @@
   "name": "react-native-uitextview-example",
   "version": "0.0.1",
   "private": true,
+  "type": "commonjs",
   "scripts": {
     "android": "react-native run-android",
     "ios": "react-native run-ios",
@@ -10,6 +11,7 @@
     "build:ios": "react-native build-ios --scheme UitextviewExample --mode Debug --extra-params \"-sdk iphonesimulator CC=clang CPLUSPLUS=clang++ LD=clang LDPLUSPLUS=clang++ GCC_OPTIMIZATION_LEVEL=0 GCC_PRECOMPILE_PREFIX_HEADER=YES ASSETCATALOG_COMPILER_OPTIMIZATION=time DEBUG_INFORMATION_FORMAT=dwarf COMPILER_INDEX_STORE_ENABLE=NO\""
   },
   "dependencies": {
+    "@dongsuo/react-native-uitextview": "workspace:*",
     "react": "19.0.0",
     "react-native": "0.79.1"
   },
@@ -23,7 +25,8 @@
     "@react-native/babel-preset": "0.79.1",
     "@react-native/metro-config": "0.79.1",
     "@react-native/typescript-config": "0.79.1",
-    "@types/react": "^19.0.0"
+    "@types/react": "^19.0.0",
+    "react-native-monorepo-config": "^0.1.9"
   },
   "engines": {
     "node": ">=18"

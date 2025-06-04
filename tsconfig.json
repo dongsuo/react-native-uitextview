@@ -2,7 +2,7 @@
   "compilerOptions": {
     "rootDir": ".",
     "paths": {
-      "react-native-uitextview": ["./src/index"]
+      "@dongsuo/react-native-uitextview": ["./src/index"]
     },
     "allowUnreachableCode": false,
     "allowUnusedLabels": false,

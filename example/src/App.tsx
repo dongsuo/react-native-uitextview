@@ -8,7 +8,8 @@ import {
   ScrollView,
   Alert,
 } from 'react-native'
-import {UITextView as Text} from 'react-native-uitextview'
+import {UITextView as Text} from '@dongsuo/react-native-uitextview'
+import CustomMenuExample from './CustomMenuExample'
 
 export default function App() {
   const [baseNumLines, setBaseNumLines] = React.useState(1)
@@ -37,7 +38,7 @@ export default function App() {
             </RNText>
             <Text style={styles.text}>Hello world!</Text>
           </View>
-
+          <CustomMenuExample />
           <View>
             <RNText style={styles.subheader}>Base RN-Text, selectable:</RNText>
             <RNText selectable style={styles.text}>

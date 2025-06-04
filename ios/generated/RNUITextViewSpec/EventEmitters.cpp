@@ -47,4 +47,15 @@ void RNUITextViewEventEmitter::onTextLayout(OnTextLayout $event) const {
   });
 }
 
+
+void RNUITextViewEventEmitter::onCustomMenuAction(OnCustomMenuAction $event) const {
+  dispatchEvent("customMenuAction", [$event=std::move($event)](jsi::Runtime &runtime) {
+    auto $payload = jsi::Object(runtime);
+    $payload.setProperty(runtime, "target", $event.target);
+$payload.setProperty(runtime, "actionId", $event.actionId);
+$payload.setProperty(runtime, "selectedText", $event.selectedText);
+    return $payload;
+  });
+}
+
 } // namespace facebook::react

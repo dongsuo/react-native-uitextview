@@ -40,7 +40,8 @@ RNUITextViewProps::RNUITextViewProps(
     numberOfLines(convertRawProp(context, rawProps, "numberOfLines", sourceProps.numberOfLines, {0})),
     allowsFontScaling(convertRawProp(context, rawProps, "allowsFontScaling", sourceProps.allowsFontScaling, {false})),
     ellipsizeMode(convertRawProp(context, rawProps, "ellipsizeMode", sourceProps.ellipsizeMode, {RNUITextViewEllipsizeMode::Tail})),
-    selectable(convertRawProp(context, rawProps, "selectable", sourceProps.selectable, {false}))
+    selectable(convertRawProp(context, rawProps, "selectable", sourceProps.selectable, {false})),
+    customMenuItems(convertRawProp(context, rawProps, "customMenuItems", sourceProps.customMenuItems, {}))
       {}
 
 } // namespace facebook::react

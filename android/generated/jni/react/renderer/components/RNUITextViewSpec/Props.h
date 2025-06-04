@@ -11,7 +11,9 @@
 
 #include <react/renderer/components/view/ViewProps.h>
 #include <react/renderer/core/PropsParserContext.h>
+#include <react/renderer/core/propsConversions.h>
 #include <react/renderer/graphics/Color.h>
+#include <vector>
 
 namespace facebook::react {
 
@@ -132,6 +134,36 @@ static inline std::string toString(const RNUITextViewEllipsizeMode &value) {
     case RNUITextViewEllipsizeMode::Clip: return "clip";
   }
 }
+struct RNUITextViewCustomMenuItemsStruct {
+  std::string title{};
+  std::string actionId{};
+};
+
+static inline void fromRawValue(const PropsParserContext& context, const RawValue &value, RNUITextViewCustomMenuItemsStruct &result) {
+  auto map = (std::unordered_map<std::string, RawValue>)value;
+
+  auto tmp_title = map.find("title");
+  if (tmp_title != map.end()) {
+    fromRawValue(context, tmp_title->second, result.title);
+  }
+  auto tmp_actionId = map.find("actionId");
+  if (tmp_actionId != map.end()) {
+    fromRawValue(context, tmp_actionId->second, result.actionId);
+  }
+}
+
+static inline std::string toString(const RNUITextViewCustomMenuItemsStruct &value) {
+  return "[Object RNUITextViewCustomMenuItemsStruct]";
+}
+
+static inline void fromRawValue(const PropsParserContext& context, const RawValue &value, std::vector<RNUITextViewCustomMenuItemsStruct> &result) {
+  auto items = (std::vector<RawValue>)value;
+  for (const auto &item : items) {
+    RNUITextViewCustomMenuItemsStruct newItem;
+    fromRawValue(context, item, newItem);
+    result.emplace_back(newItem);
+  }
+}
 
 class RNUITextViewProps final : public ViewProps {
  public:
@@ -144,6 +176,7 @@ class RNUITextViewProps final : public ViewProps {
   bool allowsFontScaling{false};
   RNUITextViewEllipsizeMode ellipsizeMode{RNUITextViewEllipsizeMode::Tail};
   bool selectable{false};
+  std::vector<RNUITextViewCustomMenuItemsStruct> customMenuItems{};
 };
 
 } // namespace facebook::react
