@@ -164,6 +164,7 @@ using namespace facebook::react;
       _textView.textContainer.lineBreakMode = NSLineBreakMode::NSLineBreakByClipping;
     }
   }
+  
 
   // I'm not sure if this is really the right way to handle this style. This means that the entire _view_ the text
   // is in will have this background color applied. To apply it just to a particular part of a string, you'd need

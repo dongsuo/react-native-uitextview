@@ -1,12 +1,12 @@
 import * as React from 'react'
 
 import {
-  StyleSheet,
-  View,
+  Alert,
   Text as RNText,
   SafeAreaView,
   ScrollView,
-  Alert,
+  StyleSheet,
+  View,
 } from 'react-native'
 import {UITextView as Text} from '@dongsuo/react-native-uitextview'
 import CustomMenuExample from './CustomMenuExample'
@@ -27,9 +27,9 @@ export default function App() {
   }, [])
 
   return (
-    <SafeAreaView style={{flex: 1}}>
-      <ScrollView style={{flex: 1, paddingHorizontal: 10}}>
-        <View style={{gap: 20, paddingBottom: 200}}>
+    <SafeAreaView style={styles.container}>
+      <ScrollView style={styles.scrollView}>
+        <View style={styles.box}>
           <RNText style={styles.header}>React Native UITextView Example</RNText>
 
           <View>
@@ -58,6 +58,62 @@ export default function App() {
               RN-UITextView, highlightable
             </RNText>
             <Text selectable uiTextView style={styles.text}>
+              Hello world!
+            </Text>
+          </View>
+
+          <RNText style={styles.header}>Alignments</RNText>
+
+          <View>
+            <RNText style={styles.subheader}>
+              RN-UITextView, selectable, highlightable, aligned to left:
+            </RNText>
+            <Text style={[styles.text, styles.alignLeft]} selectable uiTextView>
+              Hello world!
+            </Text>
+          </View>
+
+          <View>
+            <RNText style={styles.subheader}>
+              RN-UITextView, selectable, highlightable, aligned to right:
+            </RNText>
+            <Text
+              style={[styles.text, styles.alignRight]}
+              selectable
+              uiTextView>
+              Hello world!
+            </Text>
+          </View>
+
+          <View>
+            <RNText style={styles.subheader}>
+              RN-UITextView, selectable, highlightable, aligned to center:
+            </RNText>
+            <Text
+              style={[styles.text, styles.alignCenter]}
+              selectable
+              uiTextView>
+              Hello world!
+            </Text>
+          </View>
+
+          <View>
+            <RNText style={styles.subheader}>
+              RN-UITextView, selectable, highlightable, aligned to justify:
+            </RNText>
+            <Text
+              style={[styles.text, styles.alignJustify]}
+              selectable
+              uiTextView>
+              Hello world!
+            </Text>
+          </View>
+
+          <View>
+            <RNText style={styles.subheader}>
+              RN-UITextView, selectable, highlightable, auto aligned:
+            </RNText>
+            <Text style={[styles.text, styles.alignAuto]} selectable uiTextView>
               Hello world!
             </Text>
           </View>
@@ -592,10 +648,13 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-around',
   },
+  scrollView: {
+    flex: 1,
+    paddingHorizontal: 10,
+  },
   box: {
-    width: 60,
-    height: 60,
-    marginVertical: 20,
+    gap: 20,
+    paddingBottom: 200,
   },
   spacer: {
     height: 10,
@@ -608,6 +667,21 @@ const styles = StyleSheet.create({
   subheader: {
     fontSize: 22,
     fontWeight: 'bold',
+  },
+  alignCenter: {
+    textAlign: 'center',
+  },
+  alignRight: {
+    textAlign: 'right',
+  },
+  alignLeft: {
+    textAlign: 'left',
+  },
+  alignJustify: {
+    textAlign: 'justify',
+  },
+  alignAuto: {
+    textAlign: 'auto',
   },
   text: {
     fontSize: 18,
