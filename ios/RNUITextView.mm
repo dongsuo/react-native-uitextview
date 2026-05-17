@@ -14,6 +14,31 @@
 
 using namespace facebook::react;
 
+// Verbose logs are compiled out in release builds. Keeping them around for
+// debug builds preserves diagnostic value without paying the sync-I/O cost of
+// NSLog on hot paths (canPerformAction:, editMenuForTextInRange:, etc.).
+#if DEBUG
+  #define RNUITextViewLog(fmt, ...) NSLog((fmt), ##__VA_ARGS__)
+#else
+  #define RNUITextViewLog(fmt, ...) do {} while (0)
+#endif
+
+static inline NSString *_Nullable RNStringFromStdString(const std::string &value)
+{
+  if (value.empty()) {
+    return nil;
+  }
+
+  NSString *convertedString = [[NSString alloc] initWithBytes:value.data()
+                                                      length:value.size()
+                                                    encoding:NSUTF8StringEncoding];
+  if (!convertedString) {
+    RNUITextViewLog(@"[RNUITextView] Failed to convert std::string (length: %lu) to NSString", (unsigned long)value.size());
+  }
+
+  return convertedString;
+}
+
 @interface RNUITextView () <RCTRNUITextViewViewProtocol, UIGestureRecognizerDelegate, UITextViewDelegate>
 
 // 用于跟踪自定义菜单项
@@ -25,6 +50,9 @@ using namespace facebook::react;
   UIView * _view;
   UITextView * _textView;
   RNUITextViewShadowNode::ConcreteState::Shared _state;
+  facebook::react::AttributedString _lastAttributedString;
+  BOOL _hasLastAttributedString;
+  BOOL _needsTextLayoutEmit;
 }
 
 + (ComponentDescriptorProvider)componentDescriptorProvider
@@ -95,44 +123,95 @@ using namespace facebook::react;
   // Reset the frame to zero so that when it properly lays out on the next use
   _textView.frame = CGRectZero;
   _textView.attributedText = nil;
-  
+
+  _lastAttributedString = facebook::react::AttributedString{};
+  _hasLastAttributedString = NO;
+  _needsTextLayoutEmit = NO;
+
   // 清空自定义菜单项
   [self.menuItemsMap removeAllObjects];
   self.customMenuItems = nil;
 }
 
-- (void)drawRect:(CGRect)rect
+- (void)layoutSubviews
 {
-  if (!_state) {
+  [super layoutSubviews];
+
+  // Keep the inner UITextView sized to our content view.
+  if (!CGRectEqualToRect(_textView.frame, self.bounds)) {
+    _textView.frame = self.bounds;
+  }
+
+  // Emit onTextLayout once per attributedString change, after layout is ready
+  // so the layoutManager has a valid textContainer size.
+  if (_needsTextLayoutEmit && !CGRectIsEmpty(_textView.frame)) {
+    _needsTextLayoutEmit = NO;
+    [self emitOnTextLayout];
+  }
+}
+
+- (void)emitOnTextLayout
+{
+  if (_eventEmitter == nullptr) {
+    return;
+  }
+
+  using OnTextLayoutEvent = facebook::react::RNUITextViewEventEmitter::OnTextLayout;
+  OnTextLayoutEvent event{};
+  event.target = static_cast<int>(self.tag);
+
+  NSString *text = _textView.text;
+  if (text.length == 0) {
+    std::dynamic_pointer_cast<const facebook::react::RNUITextViewEventEmitter>(_eventEmitter)
+      ->onTextLayout(std::move(event));
     return;
   }
 
   const auto &props = *std::static_pointer_cast<RNUITextViewProps const>(_props);
+  const NSUInteger maxLines = props.numberOfLines;
 
-  const auto attrString = _state->getData().attributedString;
-  const auto convertedAttrString = RCTNSAttributedStringFromAttributedString(attrString);
+  // IMPORTANT: ObjC blocks capture C++ objects by CONST copy unless marked
+  // __block. That turns any non-const mutation inside the block (push_back,
+  // emplace_back, etc.) into an overload-resolution failure. To keep the
+  // block body simple and portable we populate a local pointer-captured
+  // std::vector here and move it into the event after enumeration finishes.
+  std::vector<std::string> lines;
+  if (maxLines > 0) {
+    lines.reserve(maxLines);
+  }
+  std::vector<std::string> *linesPtr = &lines;
 
-  _textView.attributedText = convertedAttrString;
-  _textView.frame = _view.frame;
-
-  const auto lines = new std::vector<std::string>();
-  [_textView.layoutManager enumerateLineFragmentsForGlyphRange:NSMakeRange(0, convertedAttrString.string.length) usingBlock:^(CGRect rect,
-                                                                                              CGRect usedRect,
-                                                                                              NSTextContainer * _Nonnull textContainer,
-                                                                                              NSRange glyphRange,
-                                                                                              BOOL * _Nonnull stop) {
-    const auto charRange = [self->_textView.layoutManager characterRangeForGlyphRange:glyphRange actualGlyphRange:nil];
-    const auto line = [self->_textView.text substringWithRange:charRange];
-
-    if (props.numberOfLines && props.numberOfLines > 0 && lines->size() < props.numberOfLines) {
-      lines->push_back(line.UTF8String);
+  // Use TextKit 2's NSTextLayoutManager. We deliberately avoid touching
+  // _textView.layoutManager anywhere in this class — the moment it is read,
+  // UITextView permanently downgrades to TextKit 1 compatibility mode, which
+  // is noticeably slower for long CJK text.
+  NSTextLayoutManager *tlm = _textView.textLayoutManager;
+  [tlm enumerateTextLayoutFragmentsFromLocation:nil
+                                        options:NSTextLayoutFragmentEnumerationOptionsEnsuresLayout
+                                     usingBlock:^BOOL(NSTextLayoutFragment * _Nonnull fragment) {
+    for (NSTextLineFragment *lineFragment in fragment.textLineFragments) {
+      if (maxLines > 0 && linesPtr->size() >= maxLines) {
+        return NO;
+      }
+      NSAttributedString *attr = lineFragment.attributedString;
+      NSRange range = lineFragment.characterRange;
+      NSString *src = attr.string;
+      if (range.location == NSNotFound || NSMaxRange(range) > src.length) {
+        continue;
+      }
+      NSString *line = [src substringWithRange:range];
+      const char *utf8 = line.UTF8String;
+      if (utf8 != nullptr) {
+        linesPtr->push_back(std::string(utf8));
+      }
     }
+    return (maxLines == 0 || linesPtr->size() < maxLines);
   }];
 
-  if (_eventEmitter != nullptr) {
-    std::dynamic_pointer_cast<const facebook::react::RNUITextViewEventEmitter>(_eventEmitter)
-    ->onTextLayout(facebook::react::RNUITextViewEventEmitter::OnTextLayout{static_cast<int>(self.tag), *lines});
-  };
+  event.lines = std::move(lines);
+
+  std::dynamic_pointer_cast<const facebook::react::RNUITextViewEventEmitter>(_eventEmitter)
+    ->onTextLayout(std::move(event));
 }
 
 - (void)updateProps:(Props::Shared const &)props oldProps:(Props::Shared const &)oldProps
@@ -149,9 +228,7 @@ using namespace facebook::react;
   }
 
   if (oldViewProps.allowFontScaling != newViewProps.allowFontScaling) {
-    if (@available(iOS 11.0, *)) {
-      _textView.adjustsFontForContentSizeCategory = newViewProps.allowFontScaling;
-    }
+    _textView.adjustsFontForContentSizeCategory = newViewProps.allowFontScaling;
   }
 
   if (oldViewProps.ellipsizeMode != newViewProps.ellipsizeMode) {
@@ -175,15 +252,35 @@ using namespace facebook::react;
     _textView.backgroundColor = RCTUIColorFromSharedColor(newViewProps.backgroundColor);
   }
   if (newViewProps.customMenuItems.size() > 0) {
-  NSMutableArray *items = [NSMutableArray array];
-  for (const auto &item : newViewProps.customMenuItems) {
-    [items addObject:@{
-      @"title": [NSString stringWithUTF8String:item.title.c_str()],
-      @"actionId": [NSString stringWithUTF8String:item.actionId.c_str()]
-    }];
+    NSMutableArray<NSDictionary *> *items = [NSMutableArray array];
+    try {
+      for (const auto &item : newViewProps.customMenuItems) {
+        try {
+          NSString *title = RNStringFromStdString(item.title);
+          NSString *actionId = RNStringFromStdString(item.actionId);
+
+          if (title.length == 0 || actionId.length == 0) {
+            RNUITextViewLog(@"[RNUITextView] Skipping invalid custom menu item (title length: %lu, actionId length: %lu)", (unsigned long)title.length, (unsigned long)actionId.length);
+            continue;
+          }
+
+          [items addObject:@{ @"title": title, @"actionId": actionId }];
+        } catch (const std::exception &e) {
+          RNUITextViewLog(@"[RNUITextView] C++ exception processing custom menu item: %s", e.what());
+        } catch (...) {
+          RNUITextViewLog(@"[RNUITextView] Unknown exception processing custom menu item");
+        }
+      }
+    } catch (const std::exception &e) {
+      RNUITextViewLog(@"[RNUITextView] C++ exception iterating custom menu items: %s", e.what());
+    } catch (...) {
+      RNUITextViewLog(@"[RNUITextView] Unknown exception iterating custom menu items");
+    }
+
+    self.customMenuItems = items.count > 0 ? items : nil;
+  } else {
+    self.customMenuItems = nil;
   }
-  self.customMenuItems = items;
-}
   // 自定义菜单项属性会在 JS 层设置，这里不需要从 props 中提取
 
   [super updateProps:props oldProps:oldProps];
@@ -193,7 +290,28 @@ using namespace facebook::react;
 - (void)updateState:(const facebook::react::State::Shared &)state oldState:(const facebook::react::State::Shared &)oldState
 {
   _state = std::static_pointer_cast<const RNUITextViewShadowNode::ConcreteState>(state);
-  [self setNeedsDisplay];
+  if (!_state) {
+    return;
+  }
+
+  const auto &attrString = _state->getData().attributedString;
+
+  // Skip redundant work if the attributed string has not actually changed.
+  // This is the hot path during scrolling / prop updates on long (CJK) text.
+  if (_hasLastAttributedString && _lastAttributedString == attrString) {
+    return;
+  }
+
+  _lastAttributedString = attrString;
+  _hasLastAttributedString = YES;
+
+  NSAttributedString *converted = RCTNSAttributedStringFromAttributedString(attrString);
+  _textView.attributedText = converted;
+
+  // Defer onTextLayout emission to layoutSubviews so the layoutManager has
+  // a valid container size to work with.
+  _needsTextLayoutEmit = YES;
+  [self setNeedsLayout];
 }
 
 // MARK: - UIGestureRecognizerDelegate
@@ -212,12 +330,18 @@ using namespace facebook::react;
 
 - (RNUITextViewChild*)getTouchChild:(CGPoint)location
 {
-  const auto charIndex = [_textView.layoutManager characterIndexForPoint:location
-                                                         inTextContainer:_textView.textContainer
-                                fractionOfDistanceBetweenInsertionPoints:nil
-  ];
+  // Use UITextInput's API rather than _textView.layoutManager. On iOS 16+ the
+  // latter permanently downgrades the view from TextKit 2 to TextKit 1, which
+  // is substantially slower for long CJK text. UITextInput works on both
+  // TextKit versions without forcing a downgrade.
+  UITextPosition *position = [_textView closestPositionToPoint:location];
+  NSInteger charIndex = 0;
+  if (position != nil) {
+    charIndex = [_textView offsetFromPosition:_textView.beginningOfDocument
+                                   toPosition:position];
+  }
 
-  int currIndex = -1;
+  NSInteger currIndex = -1;
   for (UIView* child in self.subviews) {
     if (![child isKindOfClass:[RNUITextViewChild class]]) {
       continue;
@@ -281,7 +405,7 @@ Class<RCTComponentViewProtocol> RNUITextViewCls(void)
 
 // 设置自定义菜单项
 - (void)setCustomMenuItems:(NSArray<NSDictionary *> *)customMenuItems {
-  NSLog(@"[RNUITextView] setCustomMenuItems: %@", customMenuItems);
+  RNUITextViewLog(@"[RNUITextView] setCustomMenuItems: %@", customMenuItems);
   _customMenuItems = customMenuItems;
   
   // 清空现有映射
@@ -331,7 +455,7 @@ void customMenuItemIMP(id self, SEL _cmd, id sender) {
 
 // selection 变化时设置自定义菜单项
 - (void)textViewDidChangeSelection:(UITextView *)textView {
-  NSLog(@"selection changed: range=%@ length=%lu", NSStringFromRange(textView.selectedRange), (unsigned long)textView.selectedRange.length);
+  RNUITextViewLog(@"selection changed: range=%@ length=%lu", NSStringFromRange(textView.selectedRange), (unsigned long)textView.selectedRange.length);
   
   // 如果有选中文本，则显示菜单
   if (textView.selectedRange.length > 0) {
@@ -341,7 +465,7 @@ void customMenuItemIMP(id self, SEL _cmd, id sender) {
 
 // 开始编辑时
 - (void)textViewDidBeginEditing:(UITextView *)textView {
-  NSLog(@"textViewDidBeginEditing");
+  RNUITextViewLog(@"textViewDidBeginEditing");
   // 如果有选中文本，则显示菜单
   if (textView.selectedRange.length > 0) {
     // Do nothing here, menu will be shown by textView:editMenuForTextInRange:suggestedActions:
@@ -352,7 +476,7 @@ void customMenuItemIMP(id self, SEL _cmd, id sender) {
 
 // Implement the modern API for customizing the edit menu (iOS 13+)
 - (UIMenu *)textView:(UITextView *)textView editMenuForTextInRange:(NSRange)range suggestedActions:(NSArray<UIMenuElement *> *)suggestedActions {
-    NSLog(@"textView:editMenuForTextInRange: called. Range length: %lu, Custom items: %lu", (unsigned long)range.length, (unsigned long)self.customMenuItems.count);
+    RNUITextViewLog(@"textView:editMenuForTextInRange: called. Range length: %lu, Custom items: %lu", (unsigned long)range.length, (unsigned long)self.customMenuItems.count);
 
     // Only show custom menu if text is selected and custom items exist
     if (self.customMenuItems.count == 0 || range.length == 0) {
@@ -382,9 +506,9 @@ void customMenuItemIMP(id self, SEL _cmd, id sender) {
                                                      #pragma clang diagnostic pop
                                                  }];
             [customActions addObject:uiAction];
-            NSLog(@"[RNUITextView] Adding UIAction: '%@' for actionId: '%@'", title, actionId);
+            RNUITextViewLog(@"[RNUITextView] Adding UIAction: '%@' for actionId: '%@'", title, actionId);
         } else {
-             NSLog(@"[RNUITextView] Warning: Cannot respond to selector %@ for custom menu item '%@' (actionId: '%@')", NSStringFromSelector(selector), title, actionId);
+             RNUITextViewLog(@"[RNUITextView] Warning: Cannot respond to selector %@ for custom menu item '%@' (actionId: '%@')", NSStringFromSelector(selector), title, actionId);
         }
     }
     
@@ -396,7 +520,7 @@ void customMenuItemIMP(id self, SEL _cmd, id sender) {
 // 决定哪些菜单项可以显示 - Strictest version
 - (BOOL)canPerformAction:(SEL)action withSender:(id)sender {
   NSString *actionName = NSStringFromSelector(action);
-  NSLog(@"[RNUITextView] canPerformAction: %@, selectedRange.length: %lu", actionName, (unsigned long)_textView.selectedRange.length);
+  RNUITextViewLog(@"[RNUITextView] canPerformAction: %@, selectedRange.length: %lu", actionName, (unsigned long)_textView.selectedRange.length);
 
   if (_textView.selectedRange.length > 0) {
     // Text is selected. Only allow our custom actions.
@@ -405,7 +529,7 @@ void customMenuItemIMP(id self, SEL _cmd, id sender) {
       NSString *actionId = item[@"actionId"];
       SEL customSel = NSSelectorFromString([NSString stringWithFormat:@"customMenuItemAction_%@:", actionId]);
       if (action == customSel) {
-        NSLog(@"[RNUITextView] Allowing custom action: %@", actionName);
+        RNUITextViewLog(@"[RNUITextView] Allowing custom action: %@", actionName);
         return YES;
       }
     }
@@ -436,24 +560,24 @@ void customMenuItemIMP(id self, SEL _cmd, id sender) {
         action == NSSelectorFromString(@"_accessibilitySpeakLanguageSelection:") ||
         action == NSSelectorFromString(@"_accessibilityPauseSpeaking:"))
     {
-        NSLog(@"[RNUITextView] Denying system action '%@' explicitly when text is selected to hide from menu.", actionName);
+        RNUITextViewLog(@"[RNUITextView] Denying system action '%@' explicitly when text is selected to hide from menu.", actionName);
         return NO;
     }
 
     // For any other unhandled actions when text is selected, deny them to keep the menu clean.
-    NSLog(@"[RNUITextView] Denying other unrecognized action '%@' by default when text is selected.", actionName);
+    RNUITextViewLog(@"[RNUITextView] Denying other unrecognized action '%@' by default when text is selected.", actionName);
     return NO;
 
   } else {
     // No text is selected.
     // Allow selectAll: so the user can select all text in the text view.
     if (action == @selector(selectAll:)) {
-      NSLog(@"[RNUITextView] Allowing selectAll: as no text is selected.");
+      RNUITextViewLog(@"[RNUITextView] Allowing selectAll: as no text is selected.");
       return YES;
     }
     // If you wanted to allow pasting into an empty text view, you would allow @selector(paste:) here.
     // For now, deny all other actions if no text is selected.
-    NSLog(@"[RNUITextView] Denying action: %@ because no text is selected (and not selectAll).", actionName);
+    RNUITextViewLog(@"[RNUITextView] Denying action: %@ because no text is selected (and not selectAll).", actionName);
     return NO;
   }
 }

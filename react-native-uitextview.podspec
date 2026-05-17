@@ -14,7 +14,9 @@ Pod::Spec.new do |s|
   s.license      = package["license"]
   s.authors      = package["author"]
 
-  s.platforms    = { :ios => min_ios_version_supported }
+  # Require iOS 16+. TextKit 2 (NSTextLayoutManager) is a hard dependency for
+  # the fast long-text / CJK rendering path used in this component.
+  s.platforms    = { :ios => "16.0" }
   s.source       = { :git => "https://github.com/bluesky-social/react-native-uitextview.git", :tag => "#{s.version}" }
 
   # Include module‑authored Obj‑C/Obj‑C++ plus the C++ files that Codegen

@@ -3,6 +3,7 @@
 #include <react/renderer/components/view/ViewShadowNode.h>
 
 #include <cmath>
+#include <mutex>
 
 namespace facebook::react {
 
@@ -12,7 +13,22 @@ RNUITextViewShadowNode::RNUITextViewShadowNode(
 ) : ConcreteViewShadowNode(sourceShadowNode, fragment) {
 };
 
-AttributedString _attributedString = AttributedString{};
+// Reuses a single TextLayoutManager across all RNUITextView measures so that
+// its internal TextMeasureCache can actually serve hits (AttributedString +
+// ParagraphAttributes + LayoutConstraints -> Size). Previously a new instance
+// was built on every measureContent() call, so the cache was effectively
+// always cold — this is a major win for long CJK text where Yoga probes
+// measure multiple times per layout pass.
+static std::shared_ptr<const TextLayoutManager> getSharedTextLayoutManager(
+    const ContextContainer::Shared &contextContainer) {
+  static std::mutex mutex;
+  static std::shared_ptr<const TextLayoutManager> instance;
+  std::lock_guard<std::mutex> lock(mutex);
+  if (!instance) {
+    instance = std::make_shared<const TextLayoutManager>(contextContainer);
+  }
+  return instance;
+}
 
 Size RNUITextViewShadowNode::measureContent(
   const LayoutContext& layoutContext,
@@ -125,8 +141,8 @@ Size RNUITextViewShadowNode::measureContent(
     
     TextLayoutContext textLayoutContext{};
     textLayoutContext.pointScaleFactor = layoutContext.pointScaleFactor;
-    const auto textLayoutManager = std::make_shared<const TextLayoutManager>(getContextContainer());
-        
+    const auto textLayoutManager = getSharedTextLayoutManager(getContextContainer());
+
     return textLayoutManager->measure(
       AttributedStringBox{baseAttributedString},
       paragraphAttributes,
