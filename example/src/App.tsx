@@ -2,13 +2,79 @@ import * as React from 'react'
 
 import {
   Alert,
+  FlatList,
   Text as RNText,
   SafeAreaView,
   ScrollView,
   StyleSheet,
   View,
 } from 'react-native'
-import {UITextView as Text} from 'react-native-uitextview'
+import {UITextView as Text} from '@bsky.app/react-native-uitextview'
+
+// Recycling fixture for PR #46 test plan item 6. 100 selectable UITextViews in
+// a fixed-height FlatList — scroll to force cell recycling, then select text
+// in any visible row and tap outside to confirm the window-level recognizer
+// still wires up correctly after RNUITextView's prepareForRecycle.
+const RECYCLE_ITEMS = Array.from({length: 100}, (_, i) => ({
+  id: String(i),
+  text: `Row ${i}: selectable UITextView — long-press to select, then tap outside.`,
+}))
+
+// Regression fixture for #42 / PR #45. Poppins-Regular has typoLineGap=100
+// (per OS/2 table), so without the fix UITextView renders each line ~10% taller
+// than RCTTextLayoutManager measured. With clipsToBounds=true on the wrapper,
+// the cumulative drift clips lines off the bottom. Red border = View bounds.
+const CUSTOM_FONT_PARAGRAPH =
+  'Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed do eiusmod ' +
+  'tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, ' +
+  'quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo ' +
+  'consequat. Duis aute irure dolor in reprehenderit in voluptate velit esse ' +
+  'cillum dolore eu fugiat nulla pariatur. Excepteur sint occaecat cupidatat ' +
+  'non proident, sunt in culpa qui officia deserunt mollit anim id est laborum. ' +
+  'Curabitur pretium tincidunt lacus. Nulla gravida orci a odio. Nullam varius, ' +
+  'turpis et commodo pharetra, est eros bibendum elit, nec luctus magna felis ' +
+  'sollicitudin mauris. Integer in mauris eu nibh euismod gravida. ' +
+  'Phasellus a est. Phasellus magna. In hac habitasse platea dictumst. ' +
+  'Curabitur at lacus ac velit ornare lobortis. Curabitur a felis in nunc ' +
+  'fringilla tristique. Morbi mattis ullamcorper velit. ' +
+  'Last line goes here with descenders: gypsy jumping pyramid pygmy.'
+
+// Regression fixture for allowFontScaling={false}. Raise iOS Dynamic Type
+// (Settings > Accessibility > Display & Text Size > Larger Text). The `false`
+// rows should stay fixed while the `true` rows grow. Base RN Text and
+// RN-UITextView should match each other.
+const FONT_SCALING_PARAGRAPH =
+  'Dynamic Type check with a nested bold span. This paragraph should wrap ' +
+  'onto multiple lines so scaling differences are easy to spot.'
+
+function SelectionChangeDemo() {
+  const [range, setRange] = React.useState<{start: number; end: number} | null>(
+    null,
+  )
+  const body = '😀😀 Hello 你好 مرحبا 🎉'
+  const selected = range ? body.substring(range.start, range.end) : null
+  return (
+    <View>
+      <RNText style={styles.selectionRangeLabel}>
+        {range
+          ? `start=${range.start} end=${range.end}`
+          : '(no selection events yet)'}
+      </RNText>
+      <RNText style={styles.selectionRangeLabel}>
+        substring: {selected != null ? `"${selected}"` : '(none)'}
+      </RNText>
+      <Text
+        selectable
+        uiTextView
+        style={styles.selectionBody}
+        onSelectionChange={e =>
+          setRange({start: e.nativeEvent.start, end: e.nativeEvent.end})
+        }>
+        {body}
+      </Text>
+    </View>
+  )
+}
 
 export default function App() {
   const [baseNumLines, setBaseNumLines] = React.useState(1)
@@ -30,6 +96,27 @@ export default function App() {
       <ScrollView style={styles.scrollView}>
         <View style={styles.box}>
           <RNText style={styles.header}>React Native UITextView Example</RNText>
+
+          <View>
+            <RNText style={styles.subheader}>UITextView, inline view</RNText>
+            <Text selectable uiTextView style={styles.text}>
+              Selectable text with an inline attachment{' '}
+              <View style={styles.inlineBadge}>
+                <RNText style={styles.inlineBadgeText}>1/3</RNText>
+              </View>{' '}
+              that wraps with the surrounding text.
+            </Text>
+            <RNText style={styles.subheader}>
+              Transformed inline view at end
+            </RNText>
+            <Text selectable uiTextView style={styles.text}>
+              This fixture verifies that a transformed attachment can extend
+              below the final line without being clipped{' '}
+              <View style={[styles.inlineBadge, styles.inlineBadgeOffset]}>
+                <RNText style={styles.inlineBadgeText}>3/3</RNText>
+              </View>
+            </Text>
+          </View>
 
           <View>
             <RNText style={styles.subheader}>
@@ -556,28 +643,90 @@ export default function App() {
               style={styles.text}
               selectable
               uiTextView
-              onPress={() => onPress(1)}
-              onLongPress={() => onLongPress(1)}>
+              onPress={() => onPress(1)}>
               Press Me
+            </Text>
+            <Text
+              style={styles.text}
+              selectable
+              suppressHighlighting
+              uiTextView
+              onPress={() => onPress(1)}>
+              Press Me without a highlight
             </Text>
             <Text style={styles.text} selectable uiTextView>
               Portions of UITextView text:{' '}
               <Text
                 style={[styles.text, styles.coloredBlue, styles.underlined]}
-                onPress={() => onPress(1)}>
+                onPress={() => onPress(1)}
+                onLongPress={() => onLongPress(1)}>
                 Part One
               </Text>{' '}
               <Text
                 style={[styles.text, styles.coloredHsl, styles.underlined]}
-                onPress={() => onPress(2)}>
+                onPress={() => onPress(2)}
+                onLongPress={() => onLongPress(2)}>
                 Part Two
               </Text>{' '}
               <Text style={[styles.text]}>Emoji 😅😅😅😅</Text>P
               <Text
                 style={[styles.text, styles.coloredHex, styles.underlined]}
-                onPress={() => onPress(3)}>
+                onPress={() => onPress(3)}
+                onLongPress={() => onLongPress(3)}>
                 Part Three{' '}
               </Text>
+            </Text>
+          </View>
+
+          <View>
+            <RNText style={styles.subheader}>
+              UITextView, Bluesky emoji child shape
+            </RNText>
+            <RNText style={styles.fixtureLabel}>
+              Control (emoji remains in the string):
+            </RNText>
+            <Text style={[styles.text, styles.flexOne]} selectable uiTextView>
+              {'✅ '}
+              <Text
+                style={[styles.text, styles.coloredBlue, styles.underlined]}
+                onPress={() => onPress(4)}>
+                @thebulletin.org
+              </Text>
+              {' has been verified by '}
+              <Text
+                style={[styles.text, styles.coloredBlue, styles.underlined]}
+                onPress={() => onPress(5)}>
+                @bsky.app
+              </Text>
+              {'.'}
+            </Text>
+            <RNText style={styles.fixtureLabel}>
+              Bluesky shape (nested emoji and empty-string fragments):
+            </RNText>
+            <Text style={[styles.text, styles.flexOne]} selectable uiTextView>
+              {[
+                [
+                  '',
+                  <Text key="emoji" style={[styles.text, styles.systemFont]}>
+                    ✅
+                  </Text>,
+                  ' ',
+                ],
+                <Text
+                  key="first-mention"
+                  style={[styles.text, styles.coloredBlue, styles.underlined]}
+                  onPress={() => onPress(6)}>
+                  @thebulletin.org
+                </Text>,
+                ' has been verified by ',
+                <Text
+                  key="second-mention"
+                  style={[styles.text, styles.coloredBlue, styles.underlined]}
+                  onPress={() => onPress(7)}>
+                  @bsky.app
+                </Text>,
+                '.',
+              ]}
             </Text>
           </View>
 
@@ -623,6 +772,14 @@ export default function App() {
             </Text>
           </View>
 
+          <RNText style={styles.header}>onSelectionChange</RNText>
+          <View>
+            <RNText style={styles.subheader}>
+              UITextView. Select to see start/end.
+            </RNText>
+            <SelectionChangeDemo />
+          </View>
+
           <RNText style={styles.header}>Empty String</RNText>
 
           <View>
@@ -635,6 +792,87 @@ export default function App() {
             {/* eslint-disable-next-line react/self-closing-comp */}
             <Text style={styles.text} selectable uiTextView></Text>
           </View>
+
+          <RNText style={styles.fixtureHeader}>allowFontScaling fixture</RNText>
+          <RNText style={styles.fixtureLabel}>
+            Increase iOS Larger Text. The `allowFontScaling=false` rows should
+            stay fixed-size; the `true` rows should grow. Base RN-Text and
+            UITextView should match.
+          </RNText>
+          <RNText style={styles.fixtureLabel}>
+            Base RN-Text, allowFontScaling=false
+          </RNText>
+          <RNText
+            allowFontScaling={false}
+            style={[styles.fontScalingText, styles.fixtureBorder]}>
+            {FONT_SCALING_PARAGRAPH}{' '}
+            <RNText style={styles.fontBold}>Bold child.</RNText>
+          </RNText>
+          <RNText style={styles.fixtureLabel}>
+            Base RN-Text, allowFontScaling=true
+          </RNText>
+          <RNText
+            allowFontScaling
+            style={[styles.fontScalingText, styles.fixtureBorder]}>
+            {FONT_SCALING_PARAGRAPH}{' '}
+            <RNText style={styles.fontBold}>Bold child.</RNText>
+          </RNText>
+          <RNText style={styles.fixtureLabel}>
+            UITextView, allowFontScaling=false
+          </RNText>
+          <Text
+            allowFontScaling={false}
+            selectable
+            uiTextView
+            style={[styles.fontScalingText, styles.fixtureBorder]}>
+            {FONT_SCALING_PARAGRAPH}{' '}
+            <Text style={styles.fontBold}>Bold child.</Text>
+          </Text>
+          <RNText style={styles.fixtureLabel}>
+            UITextView, allowFontScaling=true
+          </RNText>
+          <Text
+            allowFontScaling
+            selectable
+            uiTextView
+            style={[styles.fontScalingText, styles.fixtureBorder]}>
+            {FONT_SCALING_PARAGRAPH}{' '}
+            <Text style={styles.fontBold}>Bold child.</Text>
+          </Text>
+
+          <RNText style={styles.fixtureHeader}>
+            #46 fixture — FlatList recycling
+          </RNText>
+          <RNText style={styles.fixtureLabel}>
+            Scroll, select a row, scroll it offscreen and back, then tap
+            outside. No crash, selection clears.
+          </RNText>
+          <View style={styles.recycleList}>
+            <FlatList
+              data={RECYCLE_ITEMS}
+              keyExtractor={item => item.id}
+              renderItem={({item}) => (
+                <Text selectable uiTextView style={styles.recycleRow}>
+                  {item.text}
+                </Text>
+              )}
+            />
+          </View>
+
+          <RNText style={styles.fixtureHeader}>
+            #42 fixture — Poppins, lineGap=100/1000
+          </RNText>
+          <RNText style={styles.fixtureLabel}>Base RN-Text:</RNText>
+          <RNText style={[styles.customFontText, styles.fixtureBorder]}>
+            {CUSTOM_FONT_PARAGRAPH}
+          </RNText>
+          <RNText style={styles.fixtureLabel}>UITextView:</RNText>
+          <Text
+            selectable
+            uiTextView
+            style={[styles.customFontText, styles.fixtureBorder]}>
+            {CUSTOM_FONT_PARAGRAPH}
+          </Text>
         </View>
       </ScrollView>
     </SafeAreaView>
@@ -684,6 +922,12 @@ const styles = StyleSheet.create({
   },
   text: {
     fontSize: 18,
+  },
+  flexOne: {
+    flex: 1,
+  },
+  systemFont: {
+    fontFamily: 'System',
   },
   coloredBlue: {
     color: 'blue',
@@ -741,5 +985,58 @@ const styles = StyleSheet.create({
   },
   backgroundColor: {
     backgroundColor: 'yellow',
+  },
+  inlineBadge: {
+    paddingVertical: 2,
+    paddingHorizontal: 5,
+    borderRadius: 999,
+    backgroundColor: '#e5e7eb',
+  },
+  inlineBadgeText: {
+    color: '#334155',
+    fontSize: 12,
+    fontWeight: '500',
+  },
+  inlineBadgeOffset: {
+    transform: [{translateY: 6}],
+  },
+  selectionRangeLabel: {
+    fontSize: 13,
+    color: '#444',
+  },
+  selectionBody: {
+    fontSize: 16,
+  },
+  fontScalingText: {
+    fontSize: 18,
+    lineHeight: 26,
+  },
+  customFontText: {
+    fontFamily: 'Poppins',
+    fontSize: 11,
+  },
+  fixtureBorder: {
+    borderWidth: 1,
+    borderColor: 'red',
+  },
+  fixtureHeader: {
+    fontSize: 16,
+    fontWeight: 'bold',
+  },
+  fixtureLabel: {
+    fontSize: 13,
+    fontWeight: '600',
+  },
+  recycleList: {
+    height: 400,
+    borderWidth: 1,
+    borderColor: 'red',
+  },
+  recycleRow: {
+    paddingVertical: 12,
+    paddingHorizontal: 8,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderColor: '#999',
+    fontSize: 14,
   },
 })

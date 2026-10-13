@@ -1,6 +1,7 @@
 ![image](https://haileyok.com/content/images/size/w1920/2024/01/IMG_4730.jpeg)
 
 ### Note about support for this library
+
 This library was made for the
 [Bluesky Social App](https://github.com/bluesky-social/social-app). Support for this library
 is very much dependent on two factors:
@@ -38,13 +39,12 @@ block of text.
 > work the same as `2.x` and higher.
 
 > [!NOTE]
-> Version 2.0.0 of `react-native-uitextview` is tested against and used in production with React Nave 0.79. No other versions
-> are officially supported. As there have been a number of changes to the text layout engine in the new architecture, things
-> may be broken if you are not using this version of React Native with this package. Generally, these problems are inside of
-> `RNUITextViewShadowNode.cpp`.
+> Version 2.4.0 of `@bsky.app/react-native-uitextview` is tested against React Native 0.86 and supports React Native 0.81.5 and newer.
+> React Native's new-architecture text layout APIs can change between releases; compatibility issues are most likely to arise
+> in `RNUITextViewShadowNode.cpp`.
 
 ```sh
-yarn add react-native-uitextview
+yarn add @bsky.app/react-native-uitextview
 cd ios
 pod install
 ```
@@ -54,16 +54,12 @@ pod install
 React Native UITextView can - for the most part - be used as a drop-in replacement
 for existing blocks of `Text`. However, there are a few limitations:
 
-- Children of `UITextView` may only be other UITextView children (base `Text` children
-will be converted to `UITextView` children, so you only need to adjust the wrapper).
-This means that things like in-line images are not supported as they are in the base
-React Native `Text` component.
 - A few styles have not yet been implemented, but all should be possible.
 
 ## Usage
 
 Usage of this component is the same as the base React Native `Text` component. It
-can be imported as `Text` from `react-native-uitextview`, so in most cases you only
+can be imported as `Text` from `@bsky.app/react-native-uitextview`, so in most cases you only
 need to replace your current `Text` import with this one.
 
 Aside from the few limitations above, all of the existing styles and props that you
@@ -72,7 +68,7 @@ will always be used. On iOS, the base React Native `Text` component will be used
 unless the `selectable` and the `uiTextView` props are both `true`.
 
 ```tsx
-import { UITextView as Text } from "react-native-uitextview";
+import {UITextView as Text} from '@bsky.app/react-native-uitextview'
 
 function SomeView() {
   return (
@@ -80,8 +76,7 @@ function SomeView() {
       <Text
         style={{color: 'green', lineHeight: 20, fontSize: 14}}
         selectable
-        uiTextView
-      >
+        uiTextView>
         This is some highlightable text! It uses UITextView
       </Text>
       <Text
@@ -94,8 +89,8 @@ function SomeView() {
         style={{color: 'red', lineHeight: 20, fontSize: 14}}
         uiTextView // Note we do not add the selectable prop
       >
-        This text still uses the base Text component. It can't be highlighted
-        or copied at all.
+        This text still uses the base Text component. It can't be highlighted or
+        copied at all.
       </Text>
     </View>
   )
@@ -111,13 +106,83 @@ add to a link.
   This is some text that's highlightable with{' '}
   <Text
     style={{color: 'blue', textDecorationLine: 'underline'}}
-    onPress={() => Linking.openURL('https://google.com')}
-  >
+    onPress={() => Linking.openURL('https://google.com')}>
     a link
   </Text>
   .
 </Text>
 ```
+
+Inline views are also supported and participate in text measurement and wrapping:
+
+```tsx
+<Text selectable uiTextView>
+  Selectable text{' '}
+  <View
+    style={{
+      paddingHorizontal: 5,
+      paddingVertical: 2,
+      borderRadius: 999,
+      backgroundColor: '#e5e7eb',
+    }}>
+    <Text style={{fontSize: 12}}>1/3</Text>
+  </View>
+</Text>
+```
+
+Pressable `UITextView` text uses the same rounded gray press highlight as
+React Native `Text`. The highlight appears immediately, remains visible for at
+least 130 ms on a quick tap, and covers non-pressable nested spans belonging to
+the same pressable parent. Set `suppressHighlighting` to disable the visual
+feedback without disabling `onPress` or `onLongPress`.
+
+## Selection Detection
+
+`UITextView` supports native selection change events via the `onSelectionChange` callback.
+This provides real-time notifications when the user selects or deselects text, eliminating
+the need for polling-based selection detection.
+
+### Usage
+
+```tsx
+import {UITextView as Text} from '@bsky.app/react-native-uitextview'
+
+function SelectableText() {
+  const [selectedText, setSelectedText] = React.useState('')
+
+  return (
+    <Text
+      selectable
+      uiTextView
+      onSelectionChange={event => {
+        const {start, end} = event.nativeEvent
+        // Extract selected text from your content string
+        const text = content.substring(start, end)
+        setSelectedText(text)
+      }}>
+      Selectable text content
+    </Text>
+  )
+}
+```
+
+### Event Properties
+
+The `onSelectionChange` event provides the following properties:
+
+- `nativeEvent.target` - The view tag identifier
+- `nativeEvent.start` - The start index of the selected range (0-based)
+- `nativeEvent.end` - The end index of the selected range (0-based, exclusive)
+
+### Notes
+
+- Works correctly with multibyte characters (e.g., Arabic, emojis)
+- Only available on iOS when using `uiTextView={true}`
+- The event fires even when selection is cleared (`start === end`), including
+  when the library clears it itself on a tap outside the text view
+- The event fires on every selection-edge adjustment — dragging a selection
+  handle to extend by a few characters will fire many times. Consumers driving
+  expensive work off this event should debounce
 
 ## Contributing
 
